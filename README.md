@@ -6,7 +6,7 @@ The game runs in the browser with vanilla HTML, CSS, and JavaScript. No build st
 
 ## Privacy-Focused Analytics
 
-The site includes basic site analytics using GoatCounter. This is a lightweight, privacy-focused tracker used to understand visits without invasive advertising or cross-site tracking.
+The site includes basic site analytics using GoatCounter. This lightweight, privacy-focused tracker helps understand visits without invasive advertising or cross-site tracking.
 
 ## Story
 
@@ -58,8 +58,8 @@ Option 1: open the file directly
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/asher-not-king/REPOSITORY-NAME.git
-   cd REPOSITORY-NAME
+   git clone https://github.com/asher-not-king/e-waste-escape.git
+   cd e-waste-escape
    ```
 
 2. Open `index.html` in your browser.

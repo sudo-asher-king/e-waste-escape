@@ -2,8 +2,6 @@
    E-WASTE ESCAPE — Vibrant Colorful Pixel Art
    ============================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-
 * {
   margin: 0;
   padding: 0;
@@ -308,6 +306,19 @@ html, body {
   background: var(--orange);
 }
 
+body.world-mode-active .corner-mute {
+  left: calc(50% - 108px);
+  right: auto;
+  bottom: 18px;
+}
+
+body.runner-mode-active .corner-mute {
+  left: 50%;
+  right: auto;
+  bottom: 16px;
+  transform: translateX(-50%);
+}
+
 .corner-mute svg {
   display: block;
   margin: auto;
@@ -337,6 +348,18 @@ html, body {
   .corner-help { top: 12px; right: 12px; }
   .corner-github { left: 12px; bottom: 12px; top: auto; }
   .corner-mute { right: 12px; bottom: 12px; top: auto; }
+  body.runner-mode-active .corner-mute {
+    left: 50%;
+    right: auto;
+    bottom: 16px;
+    transform: translateX(-50%);
+  }
+  body.world-mode-active .corner-mute {
+    left: calc(50% - 108px);
+    right: auto;
+    bottom: 18px;
+    transform: none;
+  }
 }
 
 /* Ensure world info prompt sits above the zoom button and is fixed on desktop */
@@ -738,6 +761,7 @@ html, body {
   flex-direction: column;
   gap: 4px;
   pointer-events: none;
+  transform: none;
 }
 
 .powerup-indicator {
@@ -1507,7 +1531,34 @@ html, body {
 
   .corner-mute {
     right: 8px;
-    bottom: 52px;
+    bottom: 8px;
+    transform: none;
+  }
+
+  body.runner-mode-active .corner-mute {
+    left: 50%;
+    right: auto;
+    bottom: 10px;
+    transform: translateX(-50%);
+  }
+
+  body.world-mode-active .corner-mute {
+    left: calc(50% - 88px);
+    right: auto;
+    bottom: 10px;
+    transform: none;
+  }
+
+  body.boss-mode-active .corner-mute {
+    display: none;
+  }
+
+  body.runner-mode-active #touch-controls .touch-right {
+    margin-right: 0;
+  }
+
+  body.world-mode-active #world-touch-controls .world-actions {
+    margin-right: 0;
   }
 
   .screen-content {
@@ -1669,14 +1720,99 @@ html, body {
     bottom: 10px;
   }
 
+  body.world-mode-active #world-zoom-btn,
+  body.world-mode-active #world-info-prompt {
+    left: 50%;
+    right: auto;
+    bottom: 10px;
+    transform: translateX(-50%);
+  }
+
   #powerup-indicators {
     bottom: 64px;
     left: 8px;
+    transform: none;
+  }
+
+  body.world-mode-active #powerup-indicators,
+  body.boss-mode-active #powerup-indicators {
+    left: 50%;
+    bottom: 54px;
+    transform: translateX(-50%);
+    align-items: center;
   }
 
   .powerup-indicator {
     font-size: 5px;
     padding: 3px 5px;
+    max-width: min(260px, 84vw);
+  }
+}
+
+@media (pointer: coarse) and (orientation: landscape) {
+  .corner-btn {
+    width: 30px;
+    height: 30px;
+    border-width: 2px;
+    box-shadow: 2px 2px 0 var(--dark-text);
+    font-size: 7px;
+  }
+
+  .corner-mute {
+    left: auto;
+    right: 8px;
+    bottom: 8px;
+    transform: none;
+  }
+
+  body.runner-mode-active .corner-mute {
+    left: 50%;
+    right: auto;
+    bottom: 10px;
+    transform: translateX(-50%);
+  }
+
+  body.world-mode-active .corner-mute {
+    left: calc(50% - 88px);
+    right: auto;
+    bottom: 10px;
+    transform: none;
+  }
+
+  body.boss-mode-active .corner-mute {
+    display: none;
+  }
+
+  body.runner-mode-active #touch-controls .touch-right,
+  body.world-mode-active #world-touch-controls .world-actions {
+    margin-right: 0;
+  }
+
+  body.world-mode-active #powerup-indicators,
+  body.boss-mode-active #powerup-indicators {
+    left: 50%;
+    bottom: 54px;
+    transform: translateX(-50%);
+    align-items: center;
+  }
+
+  body.world-mode-active #world-zoom-btn,
+  body.world-mode-active #world-info-prompt {
+    left: 50%;
+    right: auto;
+    bottom: 10px;
+    transform: translateX(-50%);
+  }
+
+  body.world-mode-active .corner-mute {
+    left: calc(50% - 88px);
+    right: auto;
+    bottom: 10px;
+    transform: none;
+  }
+
+  body.boss-mode-active .corner-mute {
+    display: none;
   }
 }
 
