@@ -268,13 +268,37 @@ const Save = {
 const Audio = {
   ctx: null,
   enabled: true,
+  muted: false,
+  prefKey: 'ewaste_escape_audio_muted',
+  loadPreference() {
+    try { this.muted = localStorage.getItem(this.prefKey) === '1'; } catch(e) { this.muted = false; }
+    this.updateButton();
+  },
+  savePreference() {
+    try { localStorage.setItem(this.prefKey, this.muted ? '1' : '0'); } catch(e) {}
+  },
+  setMuted(muted) {
+    this.muted = !!muted;
+    this.savePreference();
+    this.updateButton();
+  },
+  toggleMute() {
+    this.setMuted(!this.muted);
+  },
+  updateButton() {
+    const btn = document.getElementById('btn-mute-toggle');
+    if (!btn) return;
+    btn.classList.toggle('muted', this.muted);
+    btn.setAttribute('aria-label', this.muted ? 'Unmute game audio' : 'Mute game audio');
+    btn.title = this.muted ? 'Unmute game audio' : 'Mute game audio';
+  },
   init() {
     try {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     } catch(e) { this.enabled = false; }
   },
   play(type, freq = 440, duration = 0.1, vol = 0.3) {
-    if (!this.enabled || !this.ctx) return;
+    if (!this.enabled || this.muted || !this.ctx) return;
     try {
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -305,7 +329,7 @@ const Audio = {
   gameOver() { [400, 300, 200, 150].forEach((f, i) => setTimeout(() => this.play('sawtooth', f, 0.3, 0.5), i * 200)); },
   levelComplete() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => this.play('sine', f, 0.25, 0.4), i * 150)); },
   emp() { this.play('sawtooth', 100, 0.3, 0.6); this.play('sine', 2000, 0.1, 0.4); },
-  resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+  resume() { if (!this.muted && this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
 };
 
 // ============================================
@@ -1522,6 +1546,8 @@ class Background {
     ];
     this.cloudOffset = 0;
     this.smokeParticles = [];
+    this.lowPowerCanvas = null;
+    this.lowPowerKey = '';
     for (let i = 0; i < 12; i++) {
       this.smokeParticles.push({
         x: Math.random() * 900,
@@ -1534,6 +1560,7 @@ class Background {
   }
 
   update(scrollX) {
+    if (this.isLowPower()) return;
     this.cloudOffset += 0.2;
     this.smokeParticles.forEach(p => {
       p.x -= p.speed;
@@ -1545,6 +1572,12 @@ class Background {
     const bg = this.data.bgColors;
     const W = canvas.width;
     const H = canvas.height;
+    const lowPower = this.isLowPower();
+    if (lowPower) {
+      this.drawLowPowerCached(ctx, W, H);
+      return;
+    }
+    const parallaxReps = lowPower ? [0] : [-1, 0, 1];
 
     // Sky gradient
     const skyGrad = ctx.createLinearGradient(0, 0, 0, H * 0.65);
@@ -1558,15 +1591,16 @@ class Background {
     const off0 = -(scrollX * 0.1) % W;
     ctx.save();
     ctx.globalAlpha = 0.42;
-    for (let rep = -1; rep <= 1; rep++) {
+    parallaxReps.forEach(rep => {
       const baseX = off0 + rep * W;
       this.drawCitySilhouette(ctx, baseX, H * 0.35, W, H * 0.3, this.levelId);
-    }
+    });
     ctx.restore();
 
     // Fluffy clouds
     ctx.save();
-    this.smokeParticles.forEach(p => {
+    this.smokeParticles.forEach((p, i) => {
+      if (lowPower && i % 2) return;
       ctx.globalAlpha = p.alpha * 0.7;
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
@@ -1579,27 +1613,27 @@ class Background {
     const offTower = -(scrollX * 0.16) % W;
     ctx.save();
     ctx.globalAlpha = 0.32;
-    for (let rep = -1; rep <= 1; rep++) {
+    if (!lowPower) parallaxReps.forEach(rep => {
       this.drawIndustrialDetails(ctx, offTower + rep * W, H, this.levelId);
-    }
+    });
     ctx.restore();
 
     // Layer 1: E-waste mountains
     const off1 = -(scrollX * 0.25) % W;
     ctx.save();
     ctx.globalAlpha = 0.5;
-    for (let rep = -1; rep <= 1; rep++) {
+    parallaxReps.forEach(rep => {
       this.drawWasteMountains(ctx, off1 + rep * W, H, this.levelId);
-    }
+    });
     ctx.restore();
 
     // Layer 2: Mid-ground debris
     const off2 = -(scrollX * 0.5) % W;
     ctx.save();
     ctx.globalAlpha = 0.38;
-    for (let rep = -1; rep <= 1; rep++) {
+    if (!lowPower) parallaxReps.forEach(rep => {
       this.drawMidGround(ctx, off2 + rep * W, H, this.levelId);
-    }
+    });
     ctx.restore();
 
     // Ground
@@ -1622,9 +1656,75 @@ class Background {
     const off3 = -(scrollX * 0.85) % W;
     ctx.save();
     ctx.globalAlpha = 0.35;
-    for (let rep = -1; rep <= 1; rep++) {
+    parallaxReps.forEach(rep => {
       this.drawForegroundJunk(ctx, off3 + rep * W, groundY, this.levelId);
+    });
+    ctx.restore();
+  }
+
+  isLowPower() {
+    return window.innerWidth <= 950 || window.matchMedia?.('(pointer: coarse)')?.matches;
+  }
+
+  drawLowPowerCached(ctx, W, H) {
+    const key = `${this.levelId}:${W}x${H}`;
+    if (!this.lowPowerCanvas || this.lowPowerKey !== key) {
+      this.lowPowerCanvas = document.createElement('canvas');
+      this.lowPowerCanvas.width = W;
+      this.lowPowerCanvas.height = H;
+      this.lowPowerKey = key;
+      const off = this.lowPowerCanvas.getContext('2d');
+      this.drawLowPowerStatic(off, W, H);
     }
+    ctx.drawImage(this.lowPowerCanvas, 0, 0);
+  }
+
+  drawLowPowerStatic(ctx, W, H) {
+    const bg = this.data.bgColors;
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, H * 0.65);
+    skyGrad.addColorStop(0, bg[0]);
+    skyGrad.addColorStop(0.5, bg[1]);
+    skyGrad.addColorStop(1, bg[2]);
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.globalAlpha = 0.42;
+    this.drawCitySilhouette(ctx, 0, H * 0.35, W, H * 0.3, this.levelId);
+    ctx.restore();
+
+    ctx.save();
+    this.smokeParticles.forEach((p, i) => {
+      if (i % 2) return;
+      ctx.globalAlpha = p.alpha * 0.55;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc((p.x / 900) * W, p.y, p.size * 0.9, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    this.drawWasteMountains(ctx, 0, H, this.levelId);
+    ctx.restore();
+
+    const groundY = H - 80;
+    const gGrad = ctx.createLinearGradient(0, groundY, 0, H);
+    gGrad.addColorStop(0, this.data.groundAccent);
+    gGrad.addColorStop(1, this.data.groundColor);
+    ctx.fillStyle = gGrad;
+    ctx.fillRect(0, groundY, W, H - groundY);
+    ctx.fillStyle = this.data.groundColor;
+    ctx.fillRect(0, groundY, W, 4);
+    ctx.fillStyle = this.data.groundAccent + '88';
+    for (let gx = 0; gx < W; gx += 80) {
+      ctx.fillRect(gx, groundY + 4, 40, 2);
+    }
+
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    this.drawForegroundJunk(ctx, 0, groundY, this.levelId);
     ctx.restore();
   }
 
@@ -2058,6 +2158,11 @@ class Game {
         this.useEMP();
         this.pulseControl(this.state === 'WORLD' ? 'world-touch-emp' : 'touch-emp');
       }
+      if (e.code === 'Enter' && this._worldInfoOpen && !document.getElementById('edu-popup')?.classList.contains('hidden')) {
+        e.preventDefault();
+        document.getElementById('btn-edu-continue')?.click();
+        return;
+      }
       if (e.code === 'Enter' && this.state === 'WORLD' && this.activeInfoPiece) {
         e.preventDefault();
         this.openWorldInfo();
@@ -2233,12 +2338,20 @@ class Game {
     window.addEventListener('pointerdown', tryFullOnGesture, { once: true });
     window.addEventListener('keydown', tryFullOnGesture, { once: true });
 
-    document.getElementById('btn-play')?.addEventListener('click', () => { Audio.resume(); this.startLevel(this.currentLevel); });
     document.getElementById('btn-world')?.addEventListener('click', () => { Audio.resume(); this.startWorldMode(); });
     document.getElementById('btn-story')?.addEventListener('click', () => this.showScreen('story-screen'));
     document.getElementById('btn-levels')?.addEventListener('click', () => { this.populateLevelSelect(); this.showScreen('level-select'); });
     document.getElementById('btn-highscores')?.addEventListener('click', () => { this.populateHighScores(); this.showScreen('highscores-screen'); });
     document.getElementById('btn-how-to-play')?.addEventListener('click', () => this.showScreen('howto-screen'));
+    document.getElementById('btn-credits')?.addEventListener('click', () => {
+      this.showInfoModal(
+        'CREDITS',
+        'Creator details\nE-Waste Escape was created by Asher King as a retro arcade game about repair, recycling, and e-waste education.\n\nFont credits\nPress Start 2P by CodeMan38, served through Google Fonts.\n\nAsset credits\nGame icon, pixel-art objects, characters, enemies, bosses, backgrounds, and UI art are custom assets for this project.\n\nTools and libraries\nBuilt with vanilla HTML, CSS, JavaScript, Canvas, Web Audio, and privacy-focused GoatCounter analytics.',
+        null,
+        null
+      );
+    });
+    document.getElementById('btn-mute-toggle')?.addEventListener('click', () => Audio.toggleMute());
 
     // Make clicking anywhere on the main menu request fullscreen (user gesture)
     document.getElementById('main-menu')?.addEventListener('click', (e) => {
@@ -2326,10 +2439,17 @@ class Game {
   showScreen(id) {
     this.hideAllScreens();
     document.getElementById(id)?.classList.remove('hidden');
+    this.updateCornerButtons(id === 'main-menu');
   }
 
   hideAllScreens() {
     document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+    this.updateCornerButtons(false);
+  }
+
+  updateCornerButtons(show) {
+    document.getElementById('btn-fullscreen-help')?.classList.toggle('hidden', !show);
+    document.getElementById('btn-github-help')?.classList.toggle('hidden', !show);
   }
 
   // ==================
@@ -2506,6 +2626,7 @@ class Game {
       blockers: [],
       roads: [],
       dirtPaths: [],
+      decorations: [],
       staticCanvas: null,
       staticCtx: null,
     };
@@ -2602,10 +2723,10 @@ class Game {
       const b = centers[i + 1];
       const midX = (a.x + b.x) / 2 + Math.sin(i * 2.7) * 220;
       const midY = (a.y + b.y) / 2 + Math.cos(i * 1.9) * 180;
-      addRoad(Math.min(a.x, midX), a.y - 42, Math.abs(midX - a.x) + 90, 84);
-      addRoad(midX - 42, Math.min(a.y, midY), 84, Math.abs(midY - a.y) + 90);
-      addRoad(Math.min(midX, b.x), midY - 42, Math.abs(b.x - midX) + 90, 84);
-      addRoad(b.x - 42, Math.min(midY, b.y), 84, Math.abs(b.y - midY) + 90);
+      addRoad(Math.min(a.x, midX), a.y - 54, Math.abs(midX - a.x) + 110, 108);
+      addRoad(midX - 54, Math.min(a.y, midY), 108, Math.abs(midY - a.y) + 110);
+      addRoad(Math.min(midX, b.x), midY - 54, Math.abs(b.x - midX) + 110, 108);
+      addRoad(b.x - 54, Math.min(midY, b.y), 108, Math.abs(b.y - midY) + 110);
     }
 
     for (let city = 0; city < 4; city++) {
@@ -2614,17 +2735,17 @@ class Game {
       for (let i = 0; i < 5; i++) {
         const horizontal = i % 2 === 0;
         const offset = 180 + i * 210 + Math.sin(city * 3 + i) * 95;
-        if (horizontal) addRoad(ox + 100, oy + offset, cityW - 250, 58 + (i % 3) * 12);
-        else addRoad(ox + offset, oy + 120, 58 + (i % 3) * 12, cityH - 260);
+        if (horizontal) addRoad(ox + 90, oy + offset, cityW - 230, 76 + (i % 3) * 14);
+        else addRoad(ox + offset, oy + 110, 76 + (i % 3) * 14, cityH - 240);
       }
     }
     this.world.roads = roads;
 
     this.world.dirtPaths = [
-      this.makeWorldPath([{ x: 180, y: 320 }, centers[0], centers[2], { x: 680, y: this.world.height - 160 }], 0),
-      this.makeWorldPath([{ x: this.world.width - 220, y: 260 }, centers[1], centers[3], { x: this.world.width - 760, y: this.world.height - 220 }], 7),
-      this.makeWorldPath([{ x: 360, y: cityH - 520 }, { x: cityW + 230, y: cityH - 180 }, { x: cityW + 780, y: cityH + 420 }], 13),
-      this.makeWorldPath([{ x: cityW - 420, y: 420 }, { x: cityW + 160, y: cityH + 40 }, { x: cityW - 360, y: cityH + 860 }], 21),
+      this.makeWorldPath([{ x: 180, y: 320 }, centers[0], centers[2], { x: 680, y: this.world.height - 160 }], 0, 78),
+      this.makeWorldPath([{ x: this.world.width - 220, y: 260 }, centers[1], centers[3], { x: this.world.width - 760, y: this.world.height - 220 }], 7, 82),
+      this.makeWorldPath([{ x: 360, y: cityH - 520 }, { x: cityW + 230, y: cityH - 180 }, { x: cityW + 780, y: cityH + 420 }], 13, 68),
+      this.makeWorldPath([{ x: cityW - 420, y: 420 }, { x: cityW + 160, y: cityH + 40 }, { x: cityW - 360, y: cityH + 860 }], 21, 72),
     ];
 
     const blockers = [];
@@ -2645,9 +2766,10 @@ class Game {
       blockers.push({ x: ox + 155, y: oy + cityH - 310, w: 150, h: 120, city, colorIndex: 20 });
     }
     this.world.blockers = blockers;
+    this.world.decorations = this.generateWorldDecorations();
   }
 
-  makeWorldPath(points, seed) {
+  makeWorldPath(points, seed, width = 70) {
     const expanded = [];
     points.forEach((point, index) => {
       if (index === 0) {
@@ -2663,7 +2785,48 @@ class Game {
         });
       }
     });
-    return expanded;
+    return { points: expanded, seed, width };
+  }
+
+  generateWorldDecorations() {
+    const decorations = [];
+    const add = (x, y, type, seed, size = 1) => {
+      const probe = { x: x - 20, y: y - 20, w: 40, h: 40 };
+      if (!this.world.blockers.some(b => rectsOverlap(probe, b))) {
+        decorations.push({ x, y, type, seed, size });
+      }
+    };
+
+    this.world.dirtPaths.forEach((path, pathIndex) => {
+      const pts = path.points;
+      for (let i = 1; i < pts.length; i += 2) {
+        const p = pts[i];
+        const prev = pts[i - 1];
+        const angle = Math.atan2(p.y - prev.y, p.x - prev.x);
+        const nx = -Math.sin(angle);
+        const ny = Math.cos(angle);
+        const wobble = Math.sin(path.seed + i * 1.7) * 12;
+        const sideOffset = path.width * 0.62 + wobble;
+        add(p.x + nx * sideOffset, p.y + ny * sideOffset, i % 3 === 0 ? 'flower' : 'hedge', path.seed + i, 0.85 + (i % 4) * 0.08);
+        add(p.x - nx * (sideOffset + 10), p.y - ny * (sideOffset + 10), i % 4 === 0 ? 'scrap-sign' : 'hedge', path.seed + i + 91, 0.75 + (i % 5) * 0.07);
+        if ((i + pathIndex) % 5 === 0) add(p.x + nx * (sideOffset + 42), p.y + ny * (sideOffset + 42), 'flower', path.seed + i + 33, 1);
+      }
+    });
+
+    const cityW = this.world.width / 2;
+    const cityH = this.world.height / 2;
+    for (let city = 0; city < 4; city++) {
+      const ox = (city % 2) * cityW;
+      const oy = Math.floor(city / 2) * cityH;
+      for (let i = 0; i < 10; i++) {
+        const x = ox + 140 + ((i * 173 + city * 241) % Math.max(1, cityW - 280));
+        const y = oy + 180 + ((i * 211 + city * 137) % Math.max(1, cityH - 360));
+        const type = i % 4 === 0 ? 'small-building' : (i % 3 === 0 ? 'tree' : 'flower');
+        add(x + Math.sin(i + city) * 38, y + Math.cos(i * 1.7 + city) * 42, type, city * 31 + i, 0.8 + (i % 3) * 0.12);
+      }
+    }
+
+    return decorations;
   }
 
   rectIntersectsRoad(rect) {
@@ -2833,6 +2996,12 @@ class Game {
   updateGame() {
     const player = this.player;
     const gY = this.groundY();
+    const activeMargin = this.isMobileLayout ? 180 : 320;
+    const enemyMargin = this.isMobileLayout ? 360 : 620;
+    const inActiveView = (obj, margin = activeMargin) => {
+      const w = obj.w || 80;
+      return obj.x + w > this.scrollX - margin && obj.x < this.scrollX + this.canvas.width + margin;
+    };
 
     // Fast fall
     if (this.keyJustPressed('ArrowDown') || this.keyJustPressed('KeyS')) {
@@ -2876,6 +3045,9 @@ class Game {
 
     // Particles
     this.particles.update();
+    if (this.isMobileLayout && this.particles.particles.length > 140) {
+      this.particles.particles.length = 140;
+    }
 
     // Floating texts
     this.floatingTexts = this.floatingTexts.filter(t => { t.update(); return t.life > 0; });
@@ -2891,6 +3063,7 @@ class Game {
 
     // Collectibles
     this.collectibles.forEach(c => {
+      if (!inActiveView(c)) return;
       if (c.collected) return;
       c.update();
 
@@ -2929,6 +3102,13 @@ class Game {
 
     // Hazards
     this.hazards.forEach(h => {
+      if (!inActiveView(h)) {
+        if (Number.isFinite(h.life)) {
+          h.life--;
+          if (h.life <= 0) h.expired = true;
+        }
+        return;
+      }
       h.update();
       if (Number.isFinite(h.life)) {
         h.life--;
@@ -2950,6 +3130,7 @@ class Game {
 
     // Power-ups
     this.powerups.forEach(p => {
+      if (!inActiveView(p)) return;
       if (p.collected) return;
       p.update();
       const pb2 = p.getBounds(this.scrollX);
@@ -2979,6 +3160,7 @@ class Game {
     // Enemies
     this.enemies.forEach(e => {
       if (!e.alive) return;
+      if (!inActiveView(e, enemyMargin)) return;
       e.update(player.x, player.y, this.scrollX, gY);
       const eb = e.getBounds(this.scrollX);
       const pb = { x: player.x + 6, y: player.y + 6, w: player.w - 12, h: player.h - 6 };
@@ -3660,20 +3842,25 @@ class Game {
     }
 
     if (this.state === 'PLAYING' || this.state === 'BOSS' || this.state === 'PAUSED' || this.state === 'TRANSITION') {
+      const drawMargin = this.isMobileLayout ? 120 : 260;
+      const inDrawView = (obj, margin = drawMargin) => {
+        const w = obj.w || 90;
+        return obj.x + w > this.scrollX - margin && obj.x < this.scrollX + W + margin;
+      };
       // Background
       this.bg?.draw(ctx, canvas, this.scrollX);
 
       // Collectibles
-      this.collectibles.forEach(c => c.draw(ctx, this.camera, this.scrollX));
+      this.collectibles.forEach(c => { if (inDrawView(c)) c.draw(ctx, this.camera, this.scrollX); });
 
       // Hazards
-      this.hazards.forEach(h => h.draw(ctx, this.camera, this.scrollX));
+      this.hazards.forEach(h => { if (inDrawView(h)) h.draw(ctx, this.camera, this.scrollX); });
 
       // Power-ups
-      this.powerups.forEach(p => p.draw(ctx, this.camera, this.scrollX));
+      this.powerups.forEach(p => { if (inDrawView(p)) p.draw(ctx, this.camera, this.scrollX); });
 
       // Enemies
-      this.enemies.forEach(e => e.draw(ctx, this.camera, this.scrollX));
+      this.enemies.forEach(e => { if (inDrawView(e, drawMargin + 220)) e.draw(ctx, this.camera, this.scrollX); });
 
       // Particles
       this.particles.draw(ctx);
@@ -3760,24 +3947,42 @@ class Game {
     this.drawWorldBiomeBlends(ctx, W, H, colors);
 
     this.world.dirtPaths.forEach((path, index) => {
+      const points = path.points || path;
+      const baseWidth = path.width || 70;
       ctx.save();
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.strokeStyle = index % 2 === 0 ? '#9b6b38' : '#b58546';
-      ctx.lineWidth = 42;
-      ctx.globalAlpha = 0.72;
+      ctx.strokeStyle = '#6f8f34';
+      ctx.lineWidth = baseWidth + 28;
+      ctx.globalAlpha = 0.58;
       ctx.beginPath();
-      path.forEach((p, i) => {
+      points.forEach((p, i) => {
         const sx = p.x - this.scrollX;
         const sy = p.y - this.world.cameraY;
         if (i === 0) ctx.moveTo(sx, sy);
         else ctx.lineTo(sx, sy);
       });
       ctx.stroke();
-      ctx.strokeStyle = '#e0bd75';
-      ctx.lineWidth = 12;
-      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = index % 2 === 0 ? '#9b6b38' : '#b58546';
+      ctx.lineWidth = baseWidth;
+      ctx.globalAlpha = 0.82;
       ctx.stroke();
+      ctx.strokeStyle = '#d6a864';
+      ctx.lineWidth = baseWidth * 0.48;
+      ctx.globalAlpha = 0.46;
+      ctx.stroke();
+      ctx.strokeStyle = '#f0d090';
+      ctx.lineWidth = 5;
+      ctx.globalAlpha = 0.32;
+      points.forEach((p, i) => {
+        if (i % 3) return;
+        const sx = p.x - this.scrollX + Math.sin(i + path.seed) * 12;
+        const sy = p.y - this.world.cameraY + Math.cos(i + path.seed) * 9;
+        ctx.beginPath();
+        ctx.moveTo(sx - 18, sy);
+        ctx.lineTo(sx + 18, sy + Math.sin(i) * 8);
+        ctx.stroke();
+      });
       ctx.restore();
     });
 
@@ -3831,6 +4036,7 @@ class Game {
     }
 
     this.world.blockers.forEach(b => this.drawWorldBuilding(ctx, b, colors[b.city]));
+    this.world.decorations?.forEach(d => this.drawWorldDecoration(ctx, d));
 
     ctx.save();
     ctx.fillStyle = '#1a0a3a';
@@ -3932,11 +4138,69 @@ class Game {
     ctx.fill();
   }
 
+  drawWorldDecoration(ctx, d) {
+    const sx = d.x - this.scrollX;
+    const sy = d.y - this.world.cameraY;
+    const W = ctx.canvas.width / (this.world.zoom || 1);
+    const H = ctx.canvas.height / (this.world.zoom || 1);
+    if (sx < -80 || sy < -80 || sx > W + 80 || sy > H + 80) return;
+
+    const scale = d.size || 1;
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.scale(scale, scale);
+
+    if (d.type === 'hedge') {
+      ctx.fillStyle = '#1b7f36';
+      ctx.fillRect(-18, -8, 36, 16);
+      ctx.fillStyle = '#35b84f';
+      ctx.fillRect(-14, -13, 12, 10);
+      ctx.fillRect(0, -15, 14, 12);
+      ctx.fillRect(10, -9, 12, 8);
+    } else if (d.type === 'flower') {
+      const colors = ['#ff2d78', '#ffe600', '#00d4b8', '#ff7c00'];
+      ctx.fillStyle = '#217b34';
+      ctx.fillRect(-2, -4, 4, 14);
+      ctx.fillStyle = colors[Math.abs(Math.floor(d.seed)) % colors.length];
+      ctx.fillRect(-9, -12, 7, 7);
+      ctx.fillRect(2, -12, 7, 7);
+      ctx.fillRect(-4, -18, 8, 8);
+      ctx.fillStyle = '#fff9e6';
+      ctx.fillRect(-2, -11, 4, 4);
+    } else if (d.type === 'tree') {
+      ctx.fillStyle = '#7a4a22';
+      ctx.fillRect(-5, -2, 10, 24);
+      ctx.fillStyle = '#1f8f45';
+      ctx.fillRect(-22, -28, 44, 22);
+      ctx.fillStyle = '#42c85f';
+      ctx.fillRect(-15, -38, 30, 18);
+    } else if (d.type === 'small-building') {
+      ctx.fillStyle = '#1a0a3a33';
+      ctx.fillRect(-20, -24, 46, 42);
+      ctx.fillStyle = '#00d4b8';
+      ctx.fillRect(-24, -30, 44, 44);
+      ctx.fillStyle = '#ffe600aa';
+      for (let y = -20; y < 6; y += 12) {
+        ctx.fillRect(-14, y, 7, 6);
+        ctx.fillRect(3, y, 7, 6);
+      }
+    } else {
+      ctx.fillStyle = '#1a0a3a';
+      ctx.fillRect(-12, -22, 24, 18);
+      ctx.fillStyle = '#ffe600';
+      ctx.fillRect(-8, -18, 16, 4);
+      ctx.fillStyle = '#7a4a22';
+      ctx.fillRect(-2, -4, 4, 18);
+    }
+
+    ctx.restore();
+  }
+
   drawWorldBuilding(ctx, b, palette) {
     const sx = b.x - this.scrollX;
     const sy = b.y - this.world.cameraY;
-    const W = this.canvas.width / (this.world.zoom || 1);
-    const H = this.canvas.height / (this.world.zoom || 1);
+    const W = ctx.canvas.width / (this.world.zoom || 1);
+    const H = ctx.canvas.height / (this.world.zoom || 1);
     if (sx > W || sy > H || sx + b.w < 0 || sy + b.h < 0) return;
     ctx.save();
     ctx.shadowColor = 'rgba(26, 10, 58, 0.35)';
@@ -4219,6 +4483,7 @@ function cam_x(game) {
 // ============================================
 let gameInstance;
 window.addEventListener('DOMContentLoaded', () => {
+  Audio.loadPreference();
   Audio.init();
   gameInstance = new Game();
 });

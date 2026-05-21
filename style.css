@@ -43,6 +43,10 @@ html, body {
   image-rendering: crisp-edges;
 }
 
+.hidden {
+  display: none !important;
+}
+
 /* CRT overlay — softened to just a subtle vignette */
 #crt-overlay {
   position: fixed;
@@ -236,6 +240,11 @@ html, body {
 .menu-btn:nth-child(5) { background: var(--teal); }
 .menu-btn:nth-child(6) { background: var(--blue); }
 
+#btn-credits {
+  margin-top: 8px;
+  background: var(--dark-text);
+}
+
 .menu-btn:hover {
   transform: translate(-2px, -2px);
   box-shadow: 6px 6px 0 var(--dark-text);
@@ -277,6 +286,10 @@ html, body {
   cursor: pointer;
 }
 
+.corner-btn.hidden {
+  display: none;
+}
+
 .corner-help {
   top: 12px;
   right: 12px;
@@ -289,6 +302,30 @@ html, body {
   background: var(--dark-text);
 }
 
+.corner-mute {
+  right: 12px;
+  bottom: 12px;
+  background: var(--orange);
+}
+
+.corner-mute svg {
+  display: block;
+  margin: auto;
+}
+
+.corner-mute.muted::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 50%;
+  height: 4px;
+  background: var(--red);
+  border: 1px solid var(--white);
+  transform: rotate(-38deg);
+  transform-origin: center;
+}
+
 @keyframes fadeInOut {
   0%, 100% { opacity: 0; }
   20%, 80% { opacity: 1; }
@@ -298,7 +335,8 @@ html, body {
 /* Ensure corner buttons are visible and positioned on desktop as well */
 @media (min-width: 901px) {
   .corner-help { top: 12px; right: 12px; }
-  .corner-github { top: 12px; left: 12px; bottom: auto; }
+  .corner-github { left: 12px; bottom: 12px; top: auto; }
+  .corner-mute { right: 12px; bottom: 12px; top: auto; }
 }
 
 /* Ensure world info prompt sits above the zoom button and is fixed on desktop */
@@ -316,9 +354,10 @@ html, body {
     align-items: center !important;
     justify-content: center !important;
     color: var(--white) !important;
-    background: rgba(0,0,0,0.72) !important;
-    font: 20px var(--pixel-font) !important;
+    background: var(--purple) !important;
+    font: 18px var(--pixel-font) !important;
     letter-spacing: 2px !important;
+    text-shadow: 2px 2px 0 var(--dark-text) !important;
     pointer-events: none !important;
     text-align: center !important;
     padding: 12px !important;
@@ -329,11 +368,14 @@ html, body {
     position: fixed !important;
     left: 6% !important;
     right: 6% !important;
-    bottom: 18% !important;
+    top: calc(50% + 34px) !important;
+    bottom: auto !important;
     z-index: 10001 !important;
     color: rgba(255,255,255,0.95) !important;
     font: 10px var(--pixel-font) !important;
+    line-height: 1.7 !important;
     text-align: center !important;
+    text-shadow: 1px 1px 0 var(--dark-text) !important;
     pointer-events: none !important;
     margin-top: 8px !important;
   }
@@ -797,6 +839,7 @@ html, body {
   color: var(--dark-text);
   line-height: 2;
   margin-bottom: 20px;
+  white-space: pre-line;
 }
 
 .quiz-question {
@@ -1179,7 +1222,7 @@ html, body {
     justify-content: center;
     color: var(--white);
     background: var(--purple);
-    font: 16px var(--pixel-font);
+    font: 18px var(--pixel-font);
     letter-spacing: 2px;
     text-shadow: 2px 2px 0 var(--dark-text);
     pointer-events: none;
@@ -1188,16 +1231,17 @@ html, body {
   body::after {
     content: "Best experience in fullscreen — this game will launch in fullscreen mode.";
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 18%;
+    left: 6%;
+    right: 6%;
+    top: calc(50% + 34px);
+    bottom: auto;
     z-index: 10001;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
     color: rgba(255,255,255,0.95);
     font: 10px var(--pixel-font);
     letter-spacing: 1px;
+    line-height: 1.7;
+    text-align: center;
     text-shadow: 1px 1px 0 var(--dark-text);
     pointer-events: none;
   }
@@ -1419,6 +1463,11 @@ html, body {
     letter-spacing: 1px;
   }
 
+  #btn-credits {
+    grid-column: 1 / -1;
+    margin-top: 2px;
+  }
+
   #main-menu .menu-footer {
     margin-top: 8px;
     padding-top: 8px;
@@ -1454,6 +1503,11 @@ html, body {
   .corner-github {
     left: 8px;
     bottom: 8px;
+  }
+
+  .corner-mute {
+    right: 8px;
+    bottom: 52px;
   }
 
   .screen-content {

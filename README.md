@@ -4,6 +4,10 @@ E-Waste Escape is a retro pixel-art web game about electronic waste, repair, rec
 
 The game runs in the browser with vanilla HTML, CSS, and JavaScript. No build step is required.
 
+## Privacy-Focused Analytics
+
+The site includes basic site analytics using GoatCounter. This is a lightweight, privacy-focused tracker used to understand visits without invasive advertising or cross-site tracking.
+
 ## Story
 
 In the year 2145, Earth has become a graveyard of abandoned electronics. Giant corporations left behind billions of broken phones, batteries, circuit boards, and machines, poisoning the air, soil, and water.
@@ -83,8 +87,8 @@ You can also use the Live Server extension in VS Code.
 |-- index.html      Main game page and UI screens
 |-- style.css       Visual design, layout, HUD, menus, and responsive styles
 |-- script.js       Game engine, player, levels, enemies, bosses, scoring, and saves
-|-- favicon.svg     Site icon
-|-- opengraph.jpg   Social preview image
+|-- icon.png        Site and game icon
+|-- sw.js           Service worker for static caching
 |-- robots.txt      Basic crawler settings
 ```
 
